@@ -88,15 +88,17 @@ int main(int argc, char **argv)
 
     DIR *dir;    
     FILE *raw_file;
+    FILE *out_file;
     struct dirent *ent;
     
     char out_path[256];
     size_t size;
     unsigned char *raw_data;
-    unsigned char *raw_ptr;
+    uint16_t *raw_ptr;
+    uint8_t out_ptr;
 
     uint32_t normVal = 0x180;
-    uint32_t normShift = 2; //  = 0 --> pow(2,normShift)
+    uint32_t normShift = 1; //  = 0 --> pow(2,normShift)
 
     if((normVal >> 8) == 0) {
         normVal = (normVal & 0xff);
@@ -105,17 +107,17 @@ int main(int argc, char **argv)
         normVal = -(normVal & 0xff);
     }
         
-    if ((dir = opendir("data")) != NULL) 
+    if ((dir = opendir("dnn")) != NULL) 
     {
         /* print all the files and directories within directory */
         while ((ent = readdir(dir)) != NULL) 
         {
             if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
 
-            printf ("Extract: data/%s\n", ent->d_name);
+            printf ("Extract: dnn/%s\n", ent->d_name);
     
             char path[256] = "";
-            sprintf(path, "data/%s", ent->d_name);            
+            sprintf(path, "dnn/%s", ent->d_name);            
             raw_file = fopen(path,"rb");
             fseek(raw_file, 0, SEEK_END); 
             size = ftell(raw_file);      
@@ -132,58 +134,17 @@ int main(int argc, char **argv)
             }
             
             fclose(raw_file);
-            
-            raw_ptr = (raw_data + (FRM_WIDTH*2)); // Split first two lines
-            int vp_size = IMG_WIDTH_PAD * IMG_HEIGHT;
 
-            PROFILE_START();
-            for (int i = 0; i < IMG_WIDTH*IMG_HEIGHT; i++)
+            raw_ptr = (uint16_t *)raw_data;
+
+            sprintf(out_path, "data/e_%s.raw", ent->d_name);
+            out_file = fopen(out_path,"wb");
+            for (int i = 0; i < size/2; i++)
             {
-                int i_padded = i + (IMG_PADDING * (i/IMG_WIDTH));
-                //rgbp_data.r[i] = (((raw_ptr[i_padded+(vp_size*VP_RED)] >> normShift) - normVal) & 0xFF);
-                //rgbp_data.g[i] = (((raw_ptr[i_padded+(vp_size*VP_GREEN)] >> normShift) - normVal) & 0xFF);
-                //rgbp_data.b[i] = (((raw_ptr[i_padded+(vp_size*VP_BLUE)] >> normShift) - normVal) & 0xFF);
-            
-                rgbp_data.r[i] = ((raw_ptr[i_padded+(vp_size*VP_RED)]) & 0xFF);
-                rgbp_data.g[i] = ((raw_ptr[i_padded+(vp_size*VP_GREEN)]) & 0xFF);
-                rgbp_data.b[i] = ((raw_ptr[i_padded+(vp_size*VP_BLUE)]) & 0xFF);            
-            
+                out_ptr = (uint8_t)((*(raw_ptr + i) >> 2) & 0xFF);
+                fwrite((unsigned char*)&out_ptr, sizeof(unsigned char), 1, out_file);
             }
-            PROFILE_STOP();
-
-            free(raw_data);
-            
-            PROFILE_START();
-            char class[32] = "";
-            sprintf(class, "%s: %d%%", "human", 68);
-            // draw_rect_rgb(rgbp_data, IMG_WIDTH, IMG_HEIGHT, 50, 50, 273, 257, RGB(128,32,0), 3);
-            // draw_text_rgb(rgbp_data, IMG_WIDTH, IMG_HEIGHT, 52, 52, class, RGB(128,32,0));
-            PROFILE_STOP();
-
-            // // Conversion from RGB to YCbCr
-            // PROFILE_START();
-            // for (int i = 0; i < IMG_WIDTH*IMG_HEIGHT; i++)
-            // {
-            //     yc_data.y[i]  = (( 66 * rgbp_data.r[i] + 129 * rgbp_data.g[i] +  25 * rgbp_data.b[i]) >> 8) + 16;
-            //     yc_data.cb[i] = ((-38 * rgbp_data.r[i] + -74 * rgbp_data.g[i] + 112 * rgbp_data.b[i]) >> 8) + 128;
-            //     yc_data.cr[i] = ((112 * rgbp_data.r[i] + -94 * rgbp_data.g[i] + -18 * rgbp_data.b[i]) >> 8) + 128;
-            // }
-            // PROFILE_STOP();
-
-            for (int y = 0; y < IMG_HEIGHT; y++)
-            {
-                for (int x = 0; x < IMG_WIDTH; x++)
-                {
-                    // /*compute some pixel values*/
-                    int pixel = x+(IMG_WIDTH*y);
-                    rgb_data[pixel].r = rgbp_data.r[pixel];
-                    rgb_data[pixel].g = rgbp_data.g[pixel];
-                    rgb_data[pixel].b = rgbp_data.b[pixel];
-                }
-            }
-
-            sprintf(out_path, "e_%s.ppm", ent->d_name);
-            to_ppm(out_path, rgb_data, IMG_WIDTH, IMG_HEIGHT);
+            fclose(out_file);
     
         }
         closedir (dir);

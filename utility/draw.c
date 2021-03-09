@@ -20,7 +20,7 @@ void draw_char(unsigned char *image_buffer, int image_width, int image_height,	i
 		for (int w=0; w < 8; w++) {
 			int set = font8x8_basic[(int)character][h] & 1 << w;
 			int img_index = (top + h) * image_width + (left + w);
-			image_buffer[img_index] = set ? color : image_buffer[img_index];
+			image_buffer[img_index] = (!set) ? color : 255; //image_buffer[img_index];
 		}
 	}
 }
